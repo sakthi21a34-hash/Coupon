@@ -1,0 +1,82 @@
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import type { User, Session } from '@supabase/supabase-js';
+import { supabase, ensureUserProfile } from '../lib/supabase';
+
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  isAdmin: boolean;
+  isLoading: boolean;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  session: null,
+  isAdmin: false,
+  isLoading: true,
+  signOut: async () => {},
+});
+
+export const useAuth = () => useContext(AuthContext);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsAdmin(session?.user?.user_metadata?.role === 'admin');
+      if (session?.user?.id) {
+        await ensureUserProfile(session.user.id);
+      }
+      setIsLoading(false);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsAdmin(session?.user?.user_metadata?.role === 'admin');
+      if (session?.user?.id) {
+        await ensureUserProfile(session.user.id);
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn("Native signout failed, forcing local cleanup");
+    } finally {
+      setUser(null);
+      setSession(null);
+      setIsAdmin(false);
+      
+      // Force clear any lingering Supabase tokens to prevent redirect loops
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, session, isAdmin, isLoading, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
