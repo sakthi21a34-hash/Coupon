@@ -26,8 +26,8 @@ export function LoginPage() {
     'Discover beautifully presented cards, secure wallet storage, and simple redemption from any supported merchant.';
   let routeLabel = 'Customer access';
   let routeChipClass = 'auth-route-pill auth-route-pill--customer';
-  let visualClass = 'auth-visual auth-visual--customer';
-  let formCardClass = 'card auth-form-card auth-form-card--customer';
+  let visualClass = 'auth-visual';
+  let formCardClass = 'glass-panel auth-form-card auth-form-card--customer';
   let highlightBadge = 'Lifestyle gifting flow';
   let immersiveCards = [
     {
@@ -58,8 +58,8 @@ export function LoginPage() {
       'Launch campaigns, track liability, and verify redemptions with a merchant experience that feels clean and controlled.';
     routeLabel = 'Company login';
     routeChipClass = 'auth-route-pill auth-route-pill--merchant';
-    visualClass = 'auth-visual auth-visual--merchant';
-    formCardClass = 'card auth-form-card auth-form-card--merchant';
+    visualClass = 'auth-visual';
+    formCardClass = 'glass-panel auth-form-card auth-form-card--merchant';
     highlightBadge = 'Revenue and redemption ops';
     immersiveCards = [
       {
@@ -86,8 +86,8 @@ export function LoginPage() {
       'Admin tools remain available by direct route only, with the redesign focused on clarity, trust, and control.';
     routeLabel = 'Direct admin route';
     routeChipClass = 'auth-route-pill auth-route-pill--admin';
-    visualClass = 'auth-visual auth-visual--admin';
-    formCardClass = 'card auth-form-card auth-form-card--admin';
+    visualClass = 'auth-visual';
+    formCardClass = 'glass-panel auth-form-card auth-form-card--admin';
     highlightBadge = 'Restricted command surface';
     immersiveCards = [
       {
@@ -218,10 +218,13 @@ export function LoginPage() {
   const showAdminQuickLogin = isAdminRoute;
 
   return (
-    <div className="fade-in auth-page">
+    <div className={`fade-in auth-page auth-page--${isAdminRoute ? 'admin' : isCompanyRoute ? 'merchant' : 'customer'}`}>
+      {/* Aurora Orbs for full page background effect */}
+      <div className="aurora-orb aurora-orb-1"></div>
+      <div className="aurora-orb aurora-orb-2"></div>
+      <div className="aurora-orb aurora-orb-3"></div>
+      
       <section className={visualClass}>
-        <div className="hero-orb" style={{ width: '300px', height: '300px', background: 'rgba(255,255,255,0.18)', top: '-60px', right: '-40px' }} />
-        <div className="hero-orb" style={{ width: '340px', height: '340px', background: 'rgba(128,249,200,0.18)', bottom: '-100px', left: '-40px' }} />
 
         <div className="auth-visual-inner">
           <div>

@@ -85,14 +85,14 @@ export default function ScanPage() {
         </div>
 
         {loading ? (
-          <div className="card" style={{ padding: '3rem', textAlign: 'center' }}>
+          <div className="glass-card-strong" style={{ padding: '3rem', textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.85rem' }}>
               <span className="spinner spinner-lg" />
             </div>
             <div style={{ color: 'var(--text-3)' }}>Validating voucher...</div>
           </div>
         ) : error ? (
-          <div className="card" style={{ padding: '2rem', border: '1px solid var(--red-border)' }}>
+          <div className="glass-card-strong" style={{ padding: '2rem', border: '1px solid var(--red-border)' }}>
             <span className="badge badge-red" style={{ marginBottom: '1rem' }}>
               Invalid voucher
             </span>
@@ -108,7 +108,7 @@ export default function ScanPage() {
             </div>
           </div>
         ) : data ? (
-          <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="glass-card-strong" style={{ overflow: 'hidden' }}>
             <div
               style={{
                 padding: '1.5rem',

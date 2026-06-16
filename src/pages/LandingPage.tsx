@@ -337,7 +337,7 @@ export default function LandingPage() {
               body: 'Move from wallet to counter scan with secure QR flows and clean transaction visibility.',
             },
           ].map((item) => (
-            <div key={item.title} className="card" style={{ padding: '1.25rem' }}>
+            <div key={item.title} className="glass-card-strong" style={{ padding: '1.25rem' }}>
               <div className="badge badge-purple" style={{ marginBottom: '1rem' }}>
                 Experience
               </div>
@@ -352,7 +352,7 @@ export default function LandingPage() {
 
       <section id="business" className="app-shell" style={{ marginTop: '2rem' }}>
         <div
-          className="card business-shell"
+          className="glass-card-strong business-shell"
         >
           <div className="business-copy">
             <span className="badge badge-green" style={{ marginBottom: '1rem' }}>
@@ -376,7 +376,7 @@ export default function LandingPage() {
                 'Redemption scanner',
                 'Analytics snapshots',
               ].map((item) => (
-                <div key={item} className="card" style={{ padding: '1rem', borderRadius: '22px' }}>
+                <div key={item} className="glass-card" style={{ padding: '1rem', borderRadius: '22px' }}>
                   <div className="section-label" style={{ marginBottom: '0.4rem' }}>
                     Included
                   </div>

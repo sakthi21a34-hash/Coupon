@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QRCode } from 'react-qr-code';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Eye, EyeOff, SearchX } from 'lucide-react';
+import { Eye, EyeOff, SearchX, Wallet, CreditCard, Activity, ArrowLeftRight, Gift, Sparkles, Zap, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
+import { DashboardCard } from '../components/GlassCard';
 import type { Coupon, GiftCard, Order, RedemptionTransaction } from '../lib/supabase';
 import {
   getGiftCards,
@@ -39,7 +40,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export default function UserDashboard() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { success, error: toastError } = useToast();
   const navigate = useNavigate();
   const { section } = useParams<{ section?: string }>();
@@ -51,6 +52,7 @@ export default function UserDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [redemptions, setRedemptions] = useState<RedemptionTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [catalogSearch, setCatalogSearch] = useState('');
   const [priceFilter, setPriceFilter] = useState('All');
 
@@ -117,15 +119,28 @@ export default function UserDashboard() {
   useEffect(() => { toastErrorRef.current = toastError; }, [toastError]);
 
   const loadData = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
-      const [cards, vouchers, userOrders, userRedemptions] = await Promise.all([
-        getGiftCards(),
-        getUserGiftCards(userId),
-        getUserOrders(userId),
-        getRedemptionTransactions(),
+      setLoadError(null);
+
+      // Race the data loading against a 12-second timeout
+      const loadTimeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Data loading timed out. Please try again.')), 12000)
+      );
+
+      const [cards, vouchers, userOrders, userRedemptions] = await Promise.race([
+        Promise.all([
+          getGiftCards(),
+          getUserGiftCards(userId),
+          getUserOrders(userId),
+          getRedemptionTransactions(),
+        ]),
+        loadTimeout,
       ]);
 
       setGiftCards(cards);
@@ -135,7 +150,9 @@ export default function UserDashboard() {
       const voucherIds = vouchers.map((voucher) => voucher.id);
       setRedemptions(userRedemptions.filter((redemption) => voucherIds.includes(redemption.coupon_id)));
     } catch (err: unknown) {
-      toastErrorRef.current('Load error', getErrorMessage(err, 'Failed to load dashboard details.'));
+      const msg = getErrorMessage(err, 'Failed to load dashboard details.');
+      toastErrorRef.current('Load error', msg);
+      setLoadError(msg);
     } finally {
       setLoading(false);
     }
@@ -143,12 +160,15 @@ export default function UserDashboard() {
   }, [userId]);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!userId) return;
+
     const syncDashboard = async () => {
       await loadData();
     };
 
     void syncDashboard();
-  }, [loadData]);
+  }, [authLoading, userId, loadData]);
 
   const handleInitiatePurchase = (card: GiftCard) => {
     setSelectedProduct(card);
@@ -452,12 +472,6 @@ export default function UserDashboard() {
 
   const activeVoucherCount = userVouchers.filter((voucher) => !voucher.is_used).length;
 
-  const statCards = [
-    { label: 'Wallet balance', value: `₹${walletBalance.toFixed(2)}` },
-    { label: 'Active cards', value: String(activeVoucherCount) },
-    { label: 'Transactions', value: String(combinedTransactions.length) },
-  ];
-
 
   return (
     <div className="dashboard-section fade-in">
@@ -481,28 +495,16 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      <div className="responsive-grid-4">
-        {statCards.map((card) => (
-          <div key={card.label} className="card" style={{ padding: '1.25rem' }}>
-            <div className="section-label" style={{ marginBottom: '0.5rem' }}>
-              {card.label}
-            </div>
-            <div style={{ fontSize: '1.7rem', fontWeight: 800, letterSpacing: '-0.04em' }}>{card.value}</div>
-          </div>
-        ))}
+      <div className="responsive-grid-4 fade-in-cards">
+        <DashboardCard title="Wallet balance" value={`₹${walletBalance.toFixed(2)}`} variant="primary" icon={<Wallet size={20} />} />
+        <DashboardCard title="Active cards" value={String(activeVoucherCount)} variant="emerald" icon={<CreditCard size={20} />} />
+        <DashboardCard title="Transactions" value={String(combinedTransactions.length)} variant="violet" icon={<ArrowLeftRight size={20} />} />
+        <DashboardCard title="Redeemed value" value={`₹${redemptions.reduce((acc, r) => acc + (r.amount ?? 0), 0).toFixed(2)}`} variant="amber" icon={<Gift size={20} />} />
       </div>
 
       {currentSection === 'marketplace' && (
-        <div className="dashboard-section">
-          <div
-            className="card"
-            style={{
-              padding: '1.25rem',
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1.5fr) minmax(180px, 0.7fr)',
-              gap: '1rem',
-            }}
-          >
+        <div className="dashboard-section fade-in">
+          <div className="glass-card-strong" style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(180px, 0.7fr)', gap: '1rem', alignItems: 'end' }}>
             <div>
               <label className="label">Search cards</label>
               <input
@@ -524,26 +526,39 @@ export default function UserDashboard() {
           </div>
 
           {loading ? (
-            <div className="responsive-grid-3 fade-in-cards">
+            <div className="responsive-grid-3 stagger-fade">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="card skeleton" style={{ minHeight: '220px', padding: '1rem' }} />
+                <div key={i} className="skeleton-glass" style={{ minHeight: '240px' }} />
               ))}
             </div>
-          ) : filteredCatalog.length === 0 ? (
-            <div className="card" style={{ padding: '4rem 2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ background: 'var(--surface-soft)', padding: '1rem', borderRadius: '50%', color: 'var(--text-3)' }}>
-                <SearchX size={32} />
+          ) : loadError ? (
+            <div className="glass-card-strong empty-state">
+              <div className="empty-state__icon">
+                <ShieldCheck size={28} />
               </div>
               <div>
-                <h3 style={{ margin: '0 0 0.5rem', color: 'var(--text-1)', fontSize: '1.2rem', fontWeight: 600 }}>No gift cards found</h3>
-                <p style={{ margin: 0, color: 'var(--text-3)', fontSize: '0.95rem' }}>We couldn't find any active gift cards matching your search right now.</p>
+                <h3 style={{ margin: '0 0 0.35rem', color: 'var(--text-1)', fontSize: '1.15rem', fontWeight: 600 }}>Something went wrong</h3>
+                <p style={{ margin: 0, color: 'var(--text-3)', fontSize: '0.9rem', maxWidth: '360px' }}>{loadError}</p>
               </div>
-              <button className="btn btn-secondary" onClick={() => { setCatalogSearch(''); setPriceFilter('All'); }} style={{ marginTop: '0.5rem' }}>
+              <button className="btn btn-primary" onClick={() => loadData()} style={{ marginTop: '0.25rem' }}>
+                Try again
+              </button>
+            </div>
+          ) : filteredCatalog.length === 0 ? (
+            <div className="glass-card-strong empty-state">
+              <div className="empty-state__icon">
+                <SearchX size={28} />
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 0.35rem', color: 'var(--text-1)', fontSize: '1.15rem', fontWeight: 600 }}>No gift cards found</h3>
+                <p style={{ margin: 0, color: 'var(--text-3)', fontSize: '0.9rem', maxWidth: '320px' }}>We couldn't find any active gift cards matching your search right now.</p>
+              </div>
+              <button className="btn btn-secondary" onClick={() => { setCatalogSearch(''); setPriceFilter('All'); }} style={{ marginTop: '0.25rem' }}>
                 Clear search filters
               </button>
             </div>
           ) : (
-            <div className="responsive-grid-3 fade-in-cards">
+            <div className="responsive-grid-3 stagger-fade">
               {filteredCatalog.map((card) => {
                 const val = card.value ?? 0;
                 const prc = card.price ?? 0;
@@ -551,45 +566,49 @@ export default function UserDashboard() {
                 const savingsPct = val > 0 ? Math.round((savings / val) * 100) : 0;
 
                 return (
-                  <div key={card.id} className="card card-hover" style={{ padding: '1rem' }}>
-                    <div
+                  <div key={card.id} className="card card-hover card-lift marketplace-card" style={{ padding: '1rem', position: 'relative' }}>
+                    <div className="img-zoom"
                       style={{
                         minHeight: '220px',
                         borderRadius: '24px',
                         padding: '1.2rem',
                         color: '#fff',
-                        background: `linear-gradient(160deg, rgba(25,28,29,0.6), rgba(25,28,29,0.8)), url(${card.banner_image || 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=900&auto=format&fit=crop&q=60'}) center/cover`,
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
+                        position: 'relative',
+                        overflow: 'hidden',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                        <span className="badge" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>
-                          {card.company_name || 'Brand partner'}
+                      <div className="marketplace-card-img" style={{ position: 'absolute', inset: 0, background: `url(${card.banner_image || 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=900&auto=format&fit=crop&q=60'}) center/cover`, zIndex: 0 }} />
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(160deg, rgba(25,28,29,0.55), rgba(25,28,29,0.85))', zIndex: 1 }} />
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 50%)', pointerEvents: 'none', borderRadius: '24px', zIndex: 2 }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', position: 'relative', zIndex: 3 }}>
+                        <span className="badge gift-card-badge" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff', backdropFilter: 'blur(8px)' }}>
+                          <Gift size={12} /> {card.company_name || 'Brand partner'}
                         </span>
-                        <span className="badge" style={{ background: 'rgba(128,249,200,0.2)', color: '#fff' }}>
+                        <span className="badge" style={{ background: 'rgba(128,249,200,0.2)', color: '#fff', backdropFilter: 'blur(8px)' }}>
                           Save {savingsPct}%
                         </span>
                       </div>
-                      <div>
+                      <div style={{ position: 'relative', zIndex: 3 }}>
                         <div style={{ fontSize: '1.35rem', fontWeight: 800 }}>{card.title}</div>
-                        <div style={{ color: 'rgba(255,255,255,0.78)', marginTop: '0.25rem' }}>
-                          ₹{prc.toFixed(2)} now, value ₹{val.toFixed(2)}
+                        <div style={{ color: 'rgba(255,255,255,0.78)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <Zap size={14} /> ₹{prc.toFixed(2)} now, value ₹{val.toFixed(2)}
                         </div>
                       </div>
                     </div>
 
                     <div style={{ padding: '1rem 0.35rem 0 0.35rem' }}>
-                      <p style={{ margin: '0 0 0.75rem', color: 'var(--text-3)', lineHeight: 1.6 }}>{card.description}</p>
+                      <p style={{ margin: '0 0 0.85rem', color: 'var(--text-3)', lineHeight: 1.6, fontSize: '0.88rem' }}>{card.description}</p>
                       
                       {card.issue_limit ? (() => {
                         const remaining = card.issue_limit - (card.issued_count || 0);
                         const isSoldOut = remaining <= 0;
                         return (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isSoldOut ? 'var(--red)' : 'var(--orange)' }}>
-                              {isSoldOut ? 'Sold out!' : `Only ${remaining} left!`}
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isSoldOut ? 'var(--red)' : 'var(--amber)' }}>
+                              {isSoldOut ? 'Sold out!' : `Only ${remaining} left`}
                             </span>
                             <button 
                               className={`btn ${isSoldOut ? 'btn-secondary' : 'btn-primary'} btn-sm`} 
@@ -615,37 +634,35 @@ export default function UserDashboard() {
       )}
 
       {currentSection === 'wallet' && (
-        <div className="dashboard-section">
+        <div className="dashboard-section fade-in">
           <div className="responsive-grid-2">
-            <div
-              className="card"
-              style={{
-                padding: '1.6rem',
-                background: 'linear-gradient(160deg, rgba(124,58,237,0.98), rgba(79,8,180,0.98))',
-                color: '#fff',
-              }}
-            >
-              <div style={{ marginBottom: '1.5rem' }}>
-                <span className="section-label" style={{ color: 'rgba(255,255,255,0.85)', letterSpacing: '0.15em' }}>Wallet balance</span>
-                <div style={{ fontSize: '2.6rem', fontWeight: 800, letterSpacing: '-0.05em' }}>₹{walletBalance.toFixed(2)}</div>
-                <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: 1.6 }}>
+            <div className="premium-gradient-card" style={{ padding: '1.6rem' }}>
+              <div className="premium-gradient-card__bg" />
+              <div className="premium-gradient-card__shimmer" />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                  <span className="section-label" style={{ color: 'rgba(255,255,255,0.85)', letterSpacing: '0.15em' }}>
+                    <Wallet size={14} style={{ display: 'inline', marginRight: '0.35rem', verticalAlign: 'middle' }} />
+                    Wallet balance
+                  </span>
+                  <span className="glow-dot" />
+                </div>
+                <div style={{ fontSize: '2.8rem', fontWeight: 800, letterSpacing: '-0.05em', lineHeight: 1 }}>₹{walletBalance.toFixed(2)}</div>
+                <p style={{ color: 'rgba(255,255,255,0.75)', lineHeight: 1.6, marginTop: '0.75rem', fontSize: '0.92rem' }}>
                   Use your stored balance for instant purchases, top up funds, and test wallet flows with the mock gateway.
                 </p>
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1.25rem' }}>
                   <button
                     className="btn btn-secondary btn-sm"
-                    onClick={() => {
-                      setShowAddMoneyModal(true);
-                    }}
+                    onClick={() => { setShowAddMoneyModal(true); }}
+                    style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', borderColor: 'rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)' }}
                   >
-                    Add money
+                    <Sparkles size={14} /> Add money
                   </button>
                   <button
                     className="btn btn-secondary btn-sm"
-                    onClick={() => {
-                      setWithdrawStep(1);
-                      setShowWithdrawModal(true);
-                    }}
+                    onClick={() => { setWithdrawStep(1); setShowWithdrawModal(true); }}
+                    style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', borderColor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)' }}
                   >
                     Withdraw money
                   </button>
@@ -653,40 +670,36 @@ export default function UserDashboard() {
               </div>
             </div>
 
-            <div className="card" style={{ padding: '1.5rem' }}>
-              <div className="section-label" style={{ marginBottom: '0.5rem' }}>
-                Portfolio summary
-              </div>
-              <div style={{ display: 'grid', gap: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-3)' }}>Owned cards</span>
-                  <strong>{userVouchers.length}</strong>
+            <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
+              <div className="section-label" style={{ marginBottom: '0.75rem' }}>Portfolio summary</div>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.4)', borderRadius: '14px' }}>
+                  <span style={{ color: 'var(--text-3)', fontSize: '0.9rem' }}>Owned cards</span>
+                  <strong style={{ fontSize: '1.1rem' }}>{userVouchers.length}</strong>
                 </div>
-                <div className="stats-grid">
-                  <div className="stat-card fade-in" style={{ background: 'var(--bg-3)', animationDelay: '0.1s' }}>
-                    <span style={{ color: 'var(--text-3)' }}>Redeemed amount</span>
-                    <strong>₹{redemptions.reduce((acc, redemption) => acc + (redemption.amount ?? 0), 0).toFixed(2)}</strong>
-                  </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.4)', borderRadius: '14px' }}>
+                  <span style={{ color: 'var(--text-3)', fontSize: '0.9rem' }}>Redeemed amount</span>
+                  <strong style={{ fontSize: '1.1rem' }}>₹{redemptions.reduce((acc, r) => acc + (r.amount ?? 0), 0).toFixed(2)}</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-3)' }}>Recent orders</span>
-                  <strong>{orders.length}</strong>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.4)', borderRadius: '14px' }}>
+                  <span style={{ color: 'var(--text-3)', fontSize: '0.9rem' }}>Recent orders</span>
+                  <strong style={{ fontSize: '1.1rem' }}>{orders.length}</strong>
                 </div>
               </div>
             </div>
           </div>
 
-          <div aria-live="polite" className="card" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div aria-live="polite" className="glass-card-strong" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <div>
-              <span className="section-label">Next best actions</span>
-              <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem', letterSpacing: '-0.03em' }}>Move between balance, activity, and active cards</h3>
+              <span className="section-label">Quick actions</span>
+              <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.2rem', letterSpacing: '-0.03em' }}>Move between balance, activity, and active cards</h3>
             </div>
             <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary btn-sm" onClick={() => navigate('/dashboard/cards')}>
-                View my cards
+                <CreditCard size={14} /> View cards
               </button>
               <button className="btn btn-secondary btn-sm" onClick={() => navigate('/dashboard/activity')}>
-                Open activity
+                <Activity size={14} /> Activity
               </button>
             </div>
           </div>
@@ -694,15 +707,21 @@ export default function UserDashboard() {
       )}
 
       {currentSection === 'activity' && (
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
-            <span className="section-label">Timeline</span>
-            <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem', letterSpacing: '-0.03em' }}>
+        <div className="glass-card-strong fade-in" style={{ overflow: 'hidden' }}>
+          <div style={{ padding: '1rem 1.25rem', borderBottom: '1.5px solid rgba(255,255,255,0.4)' }}>
+            <span className="section-label"><Activity size={13} style={{ display: 'inline', marginRight: '0.3rem', verticalAlign: 'middle' }} /> Timeline</span>
+            <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.25rem', letterSpacing: '-0.03em' }}>
               Transaction and settlement activity
             </h3>
           </div>
           {combinedTransactions.length === 0 ? (
-            <div style={{ padding: '2rem', color: 'var(--text-3)', textAlign: 'center' }}>No transactions recorded yet.</div>
+            <div className="empty-state" style={{ padding: '2.5rem' }}>
+              <div className="empty-state__icon"><Activity size={24} /></div>
+              <div>
+                <h3 style={{ margin: '0 0 0.35rem', color: 'var(--text-1)', fontSize: '1.05rem', fontWeight: 600 }}>No activity yet</h3>
+                <p style={{ margin: 0, color: 'var(--text-3)', fontSize: '0.9rem' }}>Your purchases and redemptions will appear here.</p>
+              </div>
+            </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table className="premium-table">
@@ -718,15 +737,15 @@ export default function UserDashboard() {
                 <tbody>
                   {combinedTransactions.map((transaction, index) => (
                     <tr key={`${transaction.date}-${index}`}>
-                      <td className="mono">{new Date(transaction.date).toLocaleString()}</td>
+                      <td className="mono" style={{ fontSize: '0.82rem' }}>{new Date(transaction.date).toLocaleString()}</td>
                       <td>{transaction.brand}</td>
                       <td>
                         <span className={`badge ${transaction.type === 'Purchase' ? 'badge-purple' : 'badge-green'}`}>
                           {transaction.type}
                         </span>
                       </td>
-                      <td className="mono">{transaction.amount}</td>
-                      <td>{transaction.status}</td>
+                      <td className="mono" style={{ fontWeight: 600 }}>{transaction.amount}</td>
+                      <td><span className="badge badge-green" style={{ fontSize: '0.65rem' }}>{transaction.status}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -737,20 +756,27 @@ export default function UserDashboard() {
       )}
 
       {currentSection === 'cards' && (
-        <div className="dashboard-section">
+        <div className="dashboard-section fade-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
-              <span className="section-label">Active vouchers</span>
-              <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.5rem', letterSpacing: '-0.03em' }}>Stored gift cards</h3>
+              <span className="section-label"><CreditCard size={13} style={{ display: 'inline', marginRight: '0.3rem', verticalAlign: 'middle' }} /> Active vouchers</span>
+              <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.4rem', letterSpacing: '-0.03em' }}>Stored gift cards</h3>
             </div>
             <button className="btn btn-secondary btn-sm" onClick={() => navigate('/dashboard/marketplace')}>
-              Buy another card
+              <Gift size={14} /> Buy another card
             </button>
           </div>
 
           {userVouchers.length === 0 ? (
-            <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-3)' }}>
-              No purchased vouchers yet. Buy one from the marketplace to start your wallet.
+            <div className="glass-card-strong empty-state">
+              <div className="empty-state__icon"><CreditCard size={26} /></div>
+              <div>
+                <h3 style={{ margin: '0 0 0.35rem', color: 'var(--text-1)', fontSize: '1.1rem', fontWeight: 600 }}>No vouchers yet</h3>
+                <p style={{ margin: 0, color: 'var(--text-3)', fontSize: '0.9rem' }}>Buy a gift card from the marketplace to see your vouchers here.</p>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={() => navigate('/dashboard/marketplace')} style={{ marginTop: '0.25rem' }}>
+                <Gift size={14} /> Browse marketplace
+              </button>
             </div>
           ) : (
             <>
@@ -760,153 +786,125 @@ export default function UserDashboard() {
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-                    {/* Active Vouchers Section */}
                     {activeVouchersList.length > 0 ? (
                       <div className="responsive-grid-3">
-                        {activeVouchersList.map((voucher) => {
-                          return (
+                        {activeVouchersList.map((voucher) => (
+                          <div
+                            key={voucher.id}
+                            className="glass-card-glow"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => e.key === 'Enter' && setActiveVoucher(voucher)}
+                            onClick={() => setActiveVoucher(voucher)}
+                            style={{ padding: '1rem', textAlign: 'left', cursor: 'pointer' }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
+                              <div>
+                                <div className="section-label" style={{ marginBottom: '0.3rem' }}>
+                                  <Gift size={12} style={{ display: 'inline', marginRight: '0.25rem', verticalAlign: 'middle' }} />
+                                  {voucher.company_name || 'Brand partner'}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <div style={{ fontWeight: 800, fontFamily: 'monospace', fontSize: '0.92rem', letterSpacing: '0.02em' }}>
+                                    {visibleCodes[voucher.id] ? voucher.code : '••••••••••••'}
+                                  </div>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setVisibleCodes(prev => ({ ...prev, [voucher.id]: !prev[voucher.id] })); }}
+                                    style={{ background: 'rgba(255,255,255,0.4)', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '4px', borderRadius: '8px', display: 'flex' }}
+                                  >
+                                    {visibleCodes[voucher.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                  </button>
+                                </div>
+                              </div>
+                              <span className="badge badge-green">{voucher.status}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.75rem 0 0', borderTop: '1.5px solid rgba(255,255,255,0.35)' }}>
+                              <div>
+                                <div style={{ color: 'var(--text-3)', fontSize: '0.78rem' }}>Remaining</div>
+                                <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>₹{(voucher.remaining_balance ?? 0).toFixed(2)}</div>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ color: 'var(--text-3)', fontSize: '0.78rem' }}>Expires</div>
+                                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{new Date(voucher.expiry_date).toLocaleDateString()}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="glass-card-strong empty-state" style={{ padding: '1.5rem' }}>
+                        <div className="empty-state__icon" style={{ width: 44, height: 44 }}><CreditCard size={20} /></div>
+                        <div>
+                          <p style={{ margin: 0, color: 'var(--text-3)', fontSize: '0.9rem' }}>No active vouchers right now.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {redeemedVouchersList.length > 0 && (
+                      <div>
+                        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <span className="section-label">Past vouchers</span>
+                          <span className="badge badge-gray" style={{ fontSize: '0.6rem' }}>{redeemedVouchersList.length}</span>
+                        </div>
+                        <div className="responsive-grid-3">
+                          {redeemedVouchersList.map((voucher) => (
                             <div
                               key={voucher.id}
-                              className="card card-hover"
+                              className="glass-card-strong"
                               role="button"
                               tabIndex={0}
                               onKeyDown={(e) => e.key === 'Enter' && setActiveVoucher(voucher)}
                               onClick={() => setActiveVoucher(voucher)}
-                    style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      borderColor: 'var(--green-border)',
-                      background: '#fff',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
-                      <div>
-                        <div className="section-label" style={{ marginBottom: '0.3rem' }}>
-                          {voucher.company_name || 'Brand partner'}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ fontWeight: 800, fontFamily: 'monospace' }}>
-                            {visibleCodes[voucher.id] ? voucher.code : '••••••••••••'}
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setVisibleCodes(prev => ({ ...prev, [voucher.id]: !prev[voucher.id] }));
-                            }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0, display: 'flex' }}
-                          >
-                            {visibleCodes[voucher.id] ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
-                      </div>
-                      <span className="badge badge-green">{voucher.status}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                      <div>
-                        <div style={{ color: 'var(--text-3)', fontSize: '0.82rem' }}>Remaining</div>
-                        <div style={{ fontWeight: 700 }}>₹{(voucher.remaining_balance ?? 0).toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--text-3)', fontSize: '0.82rem' }}>Expires</div>
-                        <div style={{ fontWeight: 700 }}>{new Date(voucher.expiry_date).toLocaleDateString()}</div>
-                      </div>
-                    </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-4)' }}>No active vouchers.</div>
-            )}
-
-            {/* Redeemed Vouchers Section */}
-            {redeemedVouchersList.length > 0 && (
-              <div>
-                <div style={{ marginBottom: '1rem' }}>
-                  <span className="section-label">Past vouchers</span>
-                  <h3 style={{ margin: '0.25rem 0 0', fontSize: '1.25rem', letterSpacing: '-0.02em', color: 'var(--text-3)' }}>Redeemed & Expired</h3>
-                </div>
-                <div className="responsive-grid-3">
-                  {redeemedVouchersList.map((voucher) => {
-                    return (
-                      <div
-                        key={voucher.id}
-                        className="card card-hover"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => e.key === 'Enter' && setActiveVoucher(voucher)}
-                        onClick={() => setActiveVoucher(voucher)}
-                        style={{
-                          padding: '1rem',
-                          textAlign: 'left',
-                          borderColor: 'var(--border)',
-                          background: 'var(--bg-2)',
-                          opacity: 0.8
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
-                          <div>
-                            <div className="section-label" style={{ marginBottom: '0.3rem', color: 'var(--text-4)' }}>
-                              {voucher.company_name || 'Brand partner'}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <div style={{ fontWeight: 800, fontFamily: 'monospace', color: 'var(--text-3)' }}>
-                                {visibleCodes[voucher.id] ? voucher.code : '••••••••••••'}
+                              style={{ padding: '1rem', textAlign: 'left', opacity: 0.75, cursor: 'pointer' }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
+                                <div>
+                                  <div className="section-label" style={{ marginBottom: '0.3rem', color: 'var(--text-4)' }}>
+                                    {voucher.company_name || 'Brand partner'}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <div style={{ fontWeight: 800, fontFamily: 'monospace', color: 'var(--text-3)', fontSize: '0.92rem' }}>
+                                      {visibleCodes[voucher.id] ? voucher.code : '••••••••••••'}
+                                    </div>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setVisibleCodes(prev => ({ ...prev, [voucher.id]: !prev[voucher.id] })); }}
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 0, display: 'flex' }}
+                                    >
+                                      {visibleCodes[voucher.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                    </button>
+                                  </div>
+                                </div>
+                                <span className="badge badge-gray">{voucher.status}</span>
                               </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setVisibleCodes(prev => ({ ...prev, [voucher.id]: !prev[voucher.id] }));
-                                }}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 0, display: 'flex' }}
-                              >
-                                {visibleCodes[voucher.id] ? <EyeOff size={16} /> : <Eye size={16} />}
-                              </button>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.75rem 0 0', borderTop: '1.5px solid rgba(255,255,255,0.25)' }}>
+                                <div>
+                                  <div style={{ color: 'var(--text-4)', fontSize: '0.78rem' }}>Remaining</div>
+                                  <div style={{ fontWeight: 700, color: 'var(--text-3)' }}>₹{(voucher.remaining_balance ?? 0).toFixed(2)}</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ color: 'var(--text-4)', fontSize: '0.78rem' }}>Expires</div>
+                                  <div style={{ fontWeight: 700, color: 'var(--text-3)' }}>{new Date(voucher.expiry_date).toLocaleDateString()}</div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                          <span className="badge badge-gray">{voucher.status}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                          <div>
-                            <div style={{ color: 'var(--text-4)', fontSize: '0.82rem' }}>Remaining</div>
-                            <div style={{ fontWeight: 700, color: 'var(--text-3)' }}>₹{(voucher.remaining_balance ?? 0).toFixed(2)}</div>
-                          </div>
-                          <div>
-                            <div style={{ color: 'var(--text-4)', fontSize: '0.82rem' }}>Expires</div>
-                            <div style={{ fontWeight: 700, color: 'var(--text-3)' }}>{new Date(voucher.expiry_date).toLocaleDateString()}</div>
-                          </div>
+                          ))}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-      </>
-    )}
-  </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </>
+          )}
+        </div>
       )}
 
       {activeVoucher && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(25, 28, 29, 0.45)',
-            backdropFilter: 'blur(10px)',
-            display: 'grid',
-            placeItems: 'center',
-            padding: '1rem',
-            zIndex: 50,
-          }}
-        >
-          <div className="card fade-in" style={{ maxWidth: '420px', width: '100%', padding: '1.5rem' }}>
+        <div className="glass-modal-overlay" style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', padding: '1rem', zIndex: 50 }}>
+          <div className="glass-modal-panel fade-in" style={{ maxWidth: '420px', width: '100%', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
               <div>
-                <span className="section-label">Ready to scan</span>
+                <span className="section-label"><ShieldCheck size={13} style={{ display: 'inline', marginRight: '0.3rem', verticalAlign: 'middle' }} /> Ready to scan</span>
                 <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.4rem', letterSpacing: '-0.03em' }}>
                   {activeVoucher.company_name || 'Voucher'}
                 </h3>
@@ -916,33 +914,30 @@ export default function UserDashboard() {
               </button>
             </div>
 
-            <div style={{ background: '#fff', borderRadius: '24px', padding: '1.2rem', display: 'grid', placeItems: 'center' }}>
+            <div style={{ background: 'rgba(255,255,255,0.85)', borderRadius: '24px', padding: '1.2rem', display: 'grid', placeItems: 'center' }}>
               <QRCode value={activeVoucher.code} size={190} fgColor="#191c1d" />
             </div>
 
-            <div className="glass-card" style={{ borderRadius: '20px', padding: '1rem', marginTop: '1rem' }}>
+            <div className="glass-card-strong" style={{ borderRadius: '20px', padding: '1rem', marginTop: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', marginBottom: '0.45rem' }}>
-                <div className="mono" style={{ fontWeight: 800 }}>
+                <div className="mono" style={{ fontWeight: 800, letterSpacing: '0.04em' }}>
                   {visibleCodes[activeVoucher.id] ? activeVoucher.code : '••••••••••••'}
                 </div>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setVisibleCodes(prev => ({ ...prev, [activeVoucher.id]: !prev[activeVoucher.id] }));
-                  }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0, display: 'flex' }}
+                  onClick={(e) => { e.stopPropagation(); setVisibleCodes(prev => ({ ...prev, [activeVoucher.id]: !prev[activeVoucher.id] })); }}
+                  style={{ background: 'rgba(255,255,255,0.4)', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '4px', borderRadius: '8px', display: 'flex' }}
                 >
                   {visibleCodes[activeVoucher.id] ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', color: 'var(--text-3)' }}>
-                <span>Balance ₹{(activeVoucher.remaining_balance ?? 0).toFixed(2)}</span>
-                <span>Expiry {new Date(activeVoucher.expiry_date).toLocaleDateString()}</span>
+                <span><strong>₹{(activeVoucher.remaining_balance ?? 0).toFixed(2)}</strong> remaining</span>
+                <span>Expires {new Date(activeVoucher.expiry_date).toLocaleDateString()}</span>
               </div>
             </div>
 
             <button
-              className="btn btn-secondary"
+              className="btn btn-primary"
               style={{ width: '100%', marginTop: '1rem' }}
               onClick={async () => {
                 let successCopy = false;
@@ -980,133 +975,91 @@ export default function UserDashboard() {
       )}
 
       {showPaymentModal && selectedProduct && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(25, 28, 29, 0.45)',
-            backdropFilter: 'blur(10px)',
-            display: 'grid',
-            placeItems: 'center',
-            padding: '1rem',
-            zIndex: 50,
-          }}
-        >
-          <div className="card fade-in" style={{ maxWidth: '460px', width: '100%', padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
+        <div className="glass-modal-overlay" style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, overflow: 'auto', padding: '1rem' }}>
+          <div className="glass-modal-panel fade-in" style={{ width: '100%', maxWidth: '480px', margin: 'auto', padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderRadius: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start' }}>
               <div>
-                <span className="section-label">Mock gateway</span>
+                <span className="section-label"><Zap size={13} style={{ display: 'inline', marginRight: '0.3rem', verticalAlign: 'middle' }} /> Checkout</span>
                 <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.4rem', letterSpacing: '-0.03em' }}>
                   {selectedProduct.title}
                 </h3>
               </div>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setSelectedProduct(null);
-                }}
-              >
+              <button className="btn btn-secondary btn-sm" onClick={() => { setShowPaymentModal(false); setSelectedProduct(null); }} style={{ flexShrink: 0 }}>
                 Close
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="card" style={{ padding: '1.25rem', marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontSize: '0.95rem' }}>
-                  <span style={{ color: 'var(--text-3)' }}>Face Value:</span>
-                  <strong>₹{(selectedProduct.value ?? 0).toFixed(2)}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontSize: '0.95rem' }}>
-                  <span style={{ color: 'var(--text-3)' }}>Purchase Price:</span>
-                  <strong style={{ color: 'var(--primary)', fontSize: '1.1rem' }}>₹{(selectedProduct.price ?? 0).toFixed(2)}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                  <span>Accrued Cashback (10%):</span>
-                  <strong>+₹{((selectedProduct.value ?? 0) * 0.1).toFixed(2)}</strong>
-                </div>
+            <div className="glass-card-strong" style={{ padding: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.95rem' }}>
+                <span style={{ color: 'var(--text-3)' }}>Face Value</span>
+                <strong>₹{(selectedProduct.value ?? 0).toFixed(2)}</strong>
               </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.95rem' }}>
+                <span style={{ color: 'var(--text-3)' }}>Purchase Price</span>
+                <strong style={{ color: 'var(--primary)', fontSize: '1.1rem' }}>₹{(selectedProduct.price ?? 0).toFixed(2)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-3)' }}>Cashback (10%)</span>
+                <strong style={{ color: '#10b981' }}>+₹{((selectedProduct.value ?? 0) * 0.1).toFixed(2)}</strong>
+              </div>
+            </div>
 
-              <div style={{ display: 'grid', gap: '0.75rem' }}>
-                <div className="glass-card" style={{ padding: '1rem', borderRadius: '12px', display: 'grid', gap: '0.75rem' }}>
-                  <div>
-                    <label className="label">Name on payment</label>
-                    <input
-                      className="input"
-                      value={mockPaymentForm.name}
-                      onChange={(event) => setMockPaymentForm({ ...mockPaymentForm, name: event.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Mock payment method</label>
-                    <select
-                      className="input"
-                      value={mockPaymentForm.method}
-                      onChange={(event) => setMockPaymentForm({ ...mockPaymentForm, method: event.target.value })}
-                    >
-                      <option>Card ending 4242</option>
-                      <option>UPI demo handle</option>
-                      <option>Netbanking sandbox</option>
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  className="btn btn-primary"
-                  style={{ width: '100%' }}
-                  onClick={handleRazorpayPurchase}
-                  disabled={paymentLoading}
+            <div className="glass-card-strong" style={{ padding: '1rem', borderRadius: '16px', display: 'grid', gap: '0.6rem' }}>
+              <div>
+                <label className="label">Name on payment</label>
+                <input
+                  className="input"
+                  value={mockPaymentForm.name}
+                  onChange={(event) => setMockPaymentForm({ ...mockPaymentForm, name: event.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">Payment method</label>
+                <select
+                  className="input"
+                  value={mockPaymentForm.method}
+                  onChange={(event) => setMockPaymentForm({ ...mockPaymentForm, method: event.target.value })}
                 >
-                  {paymentLoading ? (
-                    <>
-                      <span className="spinner" />
-                      Initializing Razorpay...
-                    </>
-                  ) : (
-                    'Pay with Razorpay'
-                  )}
-                </button>
-
-                <div style={{ position: 'relative', textAlign: 'center', margin: '0.5rem 0' }}>
-                  <span style={{ background: '#fff', padding: '0 0.75rem', position: 'relative', zIndex: 1, fontSize: '0.75rem', color: 'var(--text-3)', fontWeight: 600 }}>
-                    OR PAY WITH WALLET
-                  </span>
-                  <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: 'var(--border)' }} />
-                </div>
-
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-                  <div style={{ flex: 1, padding: '1rem', background: 'var(--bg-3)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-3)' }}>Wallet Balance</div>
-                    <strong style={{ fontSize: '0.95rem' }}>₹{walletBalance.toFixed(2)}</strong>
-                  </div>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    disabled={paymentLoading || walletBalance < selectedProduct.price}
-                    onClick={handleConfirmWalletPayment}
-                  >
-                    {walletBalance < selectedProduct.price ? 'Insufficient' : 'Pay from Wallet'}
-                  </button>
-                </div>
+                  <option>Card ending 4242</option>
+                  <option>UPI demo handle</option>
+                  <option>Netbanking sandbox</option>
+                </select>
               </div>
+            </div>
+
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleRazorpayPurchase} disabled={paymentLoading}>
+              {paymentLoading ? (
+                <><span className="spinner" /> Processing...</>
+              ) : 'Pay with Razorpay'}
+            </button>
+
+            <div style={{ position: 'relative', textAlign: 'center', margin: '0.15rem 0' }}>
+              <span style={{ background: '#ffffff', padding: '0 0.75rem', position: 'relative', zIndex: 1, fontSize: '0.7rem', color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em' }}>
+                OR PAY WITH WALLET
+              </span>
+              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: 'rgba(0,0,0,0.1)' }} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <div style={{ flex: 1, padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.03)', borderRadius: '14px' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-3)' }}>Wallet</div>
+                <strong style={{ fontSize: '1rem' }}>₹{walletBalance.toFixed(2)}</strong>
+              </div>
+              <button
+                className="btn btn-secondary btn-sm"
+                disabled={paymentLoading || walletBalance < selectedProduct.price}
+                onClick={handleConfirmWalletPayment}
+              >
+                {walletBalance < selectedProduct.price ? 'Insufficient' : 'Pay from Wallet'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {showWithdrawModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(25, 28, 29, 0.45)',
-            backdropFilter: 'blur(10px)',
-            display: 'grid',
-            placeItems: 'center',
-            padding: '1rem',
-            zIndex: 50,
-          }}
-        >
-          <div className="card fade-in" style={{ maxWidth: '420px', width: '100%', padding: '1.5rem' }}>
+        <div className="glass-modal-overlay" style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', padding: '1rem', zIndex: 50 }}>
+          <div className="glass-modal-panel fade-in" style={{ maxWidth: '420px', width: '100%', padding: '1.5rem' }}>
             {withdrawStep === 1 ? (
               <form onSubmit={handleWithdrawalSubmit} style={{ display: 'grid', gap: '0.9rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'start' }}>
@@ -1123,15 +1076,7 @@ export default function UserDashboard() {
 
                 <div>
                   <label className="label">Amount</label>
-                  <input
-                    className="input mono"
-                    type="number"
-                    step="0.01"
-                    max={walletBalance}
-                    required
-                    value={withdrawForm.amount}
-                    onChange={(event) => setWithdrawForm({ ...withdrawForm, amount: event.target.value })}
-                  />
+                  <input className="input mono" type="number" step="0.01" max={walletBalance} required value={withdrawForm.amount} onChange={(event) => setWithdrawForm({ ...withdrawForm, amount: event.target.value })} />
                 </div>
                 <div>
                   <label className="label">Routing code</label>
@@ -1142,28 +1087,15 @@ export default function UserDashboard() {
                   <input className="input mono" required value={withdrawForm.account} onChange={(event) => setWithdrawForm({ ...withdrawForm, account: event.target.value })} />
                 </div>
                 <button className="btn btn-primary" disabled={withdrawLoading} type="submit">
-                  {withdrawLoading ? (
-                    <>
-                      <span className="spinner" />
-                      Initiating payout...
-                    </>
-                  ) : (
-                    'Submit withdrawal'
-                  )}
+                  {withdrawLoading ? <><span className="spinner" /> Initiating payout...</> : 'Submit withdrawal'}
                 </button>
               </form>
             ) : (
               <div style={{ textAlign: 'center', display: 'grid', gap: '0.9rem' }}>
-                <span className="badge badge-green" style={{ margin: '0 auto' }}>
-                  Transfer created
-                </span>
+                <span className="badge badge-green" style={{ margin: '0 auto' }}>Transfer created</span>
                 <h3 style={{ margin: 0, fontSize: '1.4rem', letterSpacing: '-0.03em' }}>Payout completed</h3>
-                <p style={{ margin: 0, color: 'var(--text-3)', lineHeight: 1.6 }}>
-                  Your funds are being transferred to your bank account.
-                </p>
-                <button className="btn btn-secondary" onClick={() => setShowWithdrawModal(false)}>
-                  Close
-                </button>
+                <p style={{ margin: 0, color: 'var(--text-3)', lineHeight: 1.6 }}>Your funds are being transferred to your bank account.</p>
+                <button className="btn btn-secondary" onClick={() => setShowWithdrawModal(false)}>Close</button>
               </div>
             )}
           </div>
@@ -1171,53 +1103,22 @@ export default function UserDashboard() {
       )}
 
       {showAddMoneyModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(25, 28, 29, 0.45)',
-            backdropFilter: 'blur(10px)',
-            display: 'grid',
-            placeItems: 'center',
-            padding: '1rem',
-            zIndex: 50,
-          }}
-        >
-          <div className="card fade-in" style={{ maxWidth: '420px', width: '100%', padding: '1.5rem' }}>
+        <div className="glass-modal-overlay" style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', padding: '1rem', zIndex: 50 }}>
+          <div className="glass-modal-panel fade-in" style={{ maxWidth: '420px', width: '100%', padding: '1.5rem' }}>
             <form onSubmit={handleMockAddMoney} style={{ display: 'grid', gap: '0.9rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'start' }}>
                 <div>
-                  <span className="section-label">Wallet top-up</span>
-                  <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.4rem', letterSpacing: '-0.03em' }}>
-                    Add funds to wallet
-                  </h3>
+                  <span className="section-label"><Sparkles size={13} style={{ display: 'inline', marginRight: '0.3rem', verticalAlign: 'middle' }} /> Wallet top-up</span>
+                  <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.4rem', letterSpacing: '-0.03em' }}>Add funds to wallet</h3>
                 </div>
-                <button className="btn btn-secondary btn-sm" type="button" onClick={() => setShowAddMoneyModal(false)}>
-                  Close
-                </button>
+                <button className="btn btn-secondary btn-sm" type="button" onClick={() => setShowAddMoneyModal(false)}>Close</button>
               </div>
-
               <div>
                 <label className="label">Amount (INR)</label>
-                <input
-                  className="input mono"
-                  type="number"
-                  min="1"
-                  required
-                  value={addMoneyAmount}
-                  onChange={(event) => setAddMoneyAmount(event.target.value)}
-                />
+                <input className="input mono" type="number" min="1" required value={addMoneyAmount} onChange={(event) => setAddMoneyAmount(event.target.value)} />
               </div>
-
               <button className="btn btn-primary" disabled={addMoneyLoading} type="submit">
-                {addMoneyLoading ? (
-                  <>
-                    <span className="spinner" />
-                    Connecting to Razorpay...
-                  </>
-                ) : (
-                  'Add funds with Razorpay'
-                )}
+                {addMoneyLoading ? <><span className="spinner" /> Connecting...</> : 'Add funds with Razorpay'}
               </button>
             </form>
           </div>

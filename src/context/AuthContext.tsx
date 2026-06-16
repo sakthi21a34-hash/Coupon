@@ -28,15 +28,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Safety timeout: guarantee the UI unblocks even if auth never resolves
+    const safetyTimer = setTimeout(() => {
+      setIsLoading(false);
+    }, 10000);
+
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsAdmin(session?.user?.user_metadata?.role === 'admin');
       if (session?.user?.id) {
-        await ensureUserProfile(session.user.id);
+        try { await ensureUserProfile(session.user.id); } catch { /* non-critical */ }
       }
       setIsLoading(false);
+      clearTimeout(safetyTimer);
+    }).catch(() => {
+      // If getSession itself fails (e.g. misconfigured URL), still unblock the UI
+      setIsLoading(false);
+      clearTimeout(safetyTimer);
     });
 
     // Listen for auth changes
@@ -47,12 +57,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       setIsAdmin(session?.user?.user_metadata?.role === 'admin');
       if (session?.user?.id) {
-        await ensureUserProfile(session.user.id);
+        try { await ensureUserProfile(session.user.id); } catch { /* non-critical */ }
       }
       setIsLoading(false);
+      clearTimeout(safetyTimer);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   const signOut = async () => {

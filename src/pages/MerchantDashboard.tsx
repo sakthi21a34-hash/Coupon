@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Rocket, Store, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
+import { DashboardCard } from '../components/GlassCard';
 import type { Company, GiftCard, RedemptionTransaction } from '../lib/supabase';
 import {
   createGiftCard,
@@ -282,23 +283,14 @@ export default function MerchantDashboard() {
       </div>
 
       <div className="responsive-grid-4">
-        {[
-          { label: 'Projected sales', value: `₹${metrics.totalSales.toFixed(0)}` },
-          { label: 'Coupons redeemed', value: String(metrics.couponsRedeemed) },
-          { label: 'Active campaigns', value: String(metrics.activeOffers) },
-          { label: 'Current status', value: company?.status || 'Not started' },
-        ].map((card) => (
-          <div key={card.label} className="card" style={{ padding: '1.25rem' }}>
-            <div className="section-label" style={{ marginBottom: '0.5rem' }}>
-              {card.label}
-            </div>
-            <div style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.04em' }}>{card.value}</div>
-          </div>
-        ))}
+        <DashboardCard title="Projected sales" value={`₹${metrics.totalSales.toFixed(0)}`} variant="primary" icon={<span style={{ fontSize: '1rem' }}>₹</span>} />
+        <DashboardCard title="Coupons redeemed" value={String(metrics.couponsRedeemed)} variant="emerald" icon={<span style={{ fontSize: '1rem' }}>✓</span>} />
+        <DashboardCard title="Active campaigns" value={String(metrics.activeOffers)} variant="violet" icon={<span style={{ fontSize: '1rem' }}>🚀</span>} />
+        <DashboardCard title="Current status" value={company?.status || 'Not started'} variant="amber" icon={<span style={{ fontSize: '1rem' }}>⚡</span>} />
       </div>
 
       {!company && currentSection !== 'onboarding' && (
-        <div className="card" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="glass-card-strong" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
             <span className="section-label">Setup needed</span>
             <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.25rem' }}>Complete onboarding to unlock merchant tools</h3>
@@ -310,7 +302,7 @@ export default function MerchantDashboard() {
       )}
 
       {company?.status === 'pending' && currentSection !== 'onboarding' && (
-        <div className="card" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="glass-card-strong" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
             <span className="section-label">Verification in progress</span>
             <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.25rem' }}>Your company profile is waiting for admin approval</h3>
@@ -324,105 +316,108 @@ export default function MerchantDashboard() {
       {currentSection === 'overview' && (
         <div className="dashboard-section">
           <div className="responsive-grid-2">
-            <div className="card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
+            <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1.25rem' }}>
                 <div>
                   <span className="section-label">Company snapshot</span>
-                  <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>Profile and approval state</h3>
+                  <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.25rem', letterSpacing: '-0.03em' }}>Profile & approval state</h3>
                 </div>
                 <span className={`badge ${companyStatusTone}`}>{company?.status || 'not started'}</span>
               </div>
-              <div style={{ display: 'grid', gap: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                  <span style={{ color: 'var(--text-3)' }}>Brand prefix</span>
-                  <strong className="mono">{company?.prefix || '---'}</strong>
-                </div>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                {[
+                  { label: 'Brand prefix', value: company?.prefix || '---', mono: true },
+                ].map(row => (
+                  <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.85rem', background: 'rgba(79,99,245,0.04)', borderRadius: '12px' }}>
+                    <span style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>{row.label}</span>
+                    <strong className={row.mono ? 'mono' : ''}>{row.value}</strong>
+                  </div>
+                ))}
                 {(() => {
                   const globalLimit = company?.coupon_limit || 0;
                   const totalIssued = offers.reduce((acc, offer) => acc + (offer.issued_count || 0), 0);
                   const availableLimit = Math.max(0, globalLimit - totalIssued);
-
                   return (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                        <span style={{ color: 'var(--text-3)' }}>Total global limit</span>
-                        <strong>{globalLimit}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                        <span style={{ color: 'var(--text-3)' }}>Used limit (issued)</span>
-                        <strong>{totalIssued}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                        <span style={{ color: 'var(--text-3)' }}>Available limit</span>
-                        <strong style={{ color: availableLimit > 0 ? 'var(--green)' : 'var(--red)' }}>{availableLimit}</strong>
-                      </div>
+                      {[
+                        { label: 'Total global limit', value: String(globalLimit), mono: false },
+                        { label: 'Used limit (issued)', value: String(totalIssued), mono: false },
+                        { label: 'Available limit', value: String(availableLimit), mono: false, color: availableLimit > 0 ? 'var(--green)' : 'var(--red)' },
+                      ].map(row => (
+                        <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.85rem', background: 'rgba(79,99,245,0.04)', borderRadius: '12px' }}>
+                          <span style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>{row.label}</span>
+                          <strong style={row.color ? { color: row.color } : {}}>{row.value}</strong>
+                        </div>
+                      ))}
                     </>
                   );
                 })()}
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text-3)' }}>Outstanding liability</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.85rem', background: 'rgba(79,99,245,0.04)', borderRadius: '12px', marginTop: '0.25rem', borderTop: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>Outstanding liability</span>
                   <strong>₹{Math.max(metrics.liabilities, 0).toFixed(2)}</strong>
                 </div>
               </div>
             </div>
 
-            <div className="card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-                <div>
-                  <span className="section-label">Shortcuts</span>
-                  <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>Move quickly between merchant tools</h3>
-                </div>
+            <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <span className="section-label">Quick navigation</span>
+                <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.25rem', letterSpacing: '-0.03em' }}>Move between merchant tools</h3>
               </div>
               <div style={{ display: 'grid', gap: '0.75rem' }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => navigate('/merchant/campaigns')}>
-                  Launch a new campaign
+                <button className="btn btn-primary btn-sm" onClick={() => navigate('/merchant/campaigns')}>
+                  🚀 Launch a new campaign
                 </button>
-
                 <button className="btn btn-secondary btn-sm" onClick={() => navigate('/merchant/onboarding')}>
-                  Review onboarding details
+                  📋 Review onboarding details
+                </button>
+                <button className="btn btn-secondary btn-sm" onClick={() => navigate('/merchant/redemptions')}>
+                  🔍 View redemption log
                 </button>
               </div>
             </div>
           </div>
 
           {recentOffers.length === 0 && company?.status === 'approved' && (
-            <div className="card" style={{ padding: '2rem', display: 'flex', gap: '1.5rem', alignItems: 'center', background: 'linear-gradient(135deg, var(--surface) 0%, var(--surface-soft) 100%)', marginBottom: '1.5rem' }}>
-              <div style={{ background: 'var(--primary-soft)', padding: '1.25rem', borderRadius: '50%', color: 'var(--primary)' }}>
+            <div className="premium-gradient-card" style={{ padding: '2rem', display: 'flex', gap: '1.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <div className="premium-gradient-card__bg" />
+              <div className="premium-gradient-card__shimmer" />
+              <div style={{ position: 'relative', zIndex: 1, background: 'rgba(255,255,255,0.18)', padding: '1.25rem', borderRadius: '50%', color: '#fff' }}>
                 <Rocket size={32} />
               </div>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.4rem' }}>Welcome to your Merchant Dashboard!</h3>
-                <p style={{ margin: 0, color: 'var(--text-3)' }}>You are fully verified. Your next step is to create a Campaign to launch your first gift card into the marketplace.</p>
+              <div style={{ flex: 1, position: 'relative', zIndex: 1 }}>
+                <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.4rem', color: '#fff', fontWeight: 800 }}>Welcome to your Merchant Dashboard!</h3>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.82)' }}>You are fully verified. Your next step is to create a Campaign to launch your first gift card into the marketplace.</p>
               </div>
-              <button className="btn btn-primary" onClick={() => navigate('/merchant/campaigns')}>
+              <button className="btn" onClick={() => navigate('/merchant/campaigns')} style={{ position: 'relative', zIndex: 1, background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(8px)' }}>
                 Launch First Campaign
               </button>
             </div>
           )}
 
           <div className="responsive-grid-2">
-            <div className="card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
+            <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1.25rem' }}>
                 <div>
                   <span className="section-label">Active campaigns</span>
-                  <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>Recent gift card launches</h3>
+                  <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.25rem', letterSpacing: '-0.03em' }}>Recent gift card launches</h3>
                 </div>
                 <button className="btn btn-secondary btn-sm" onClick={() => navigate('/merchant/campaigns')}>
                   Manage
                 </button>
               </div>
               {recentOffers.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'var(--surface-soft)', borderRadius: '16px', marginTop: '1rem' }}>
+                <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'rgba(79,99,245,0.04)', borderRadius: '16px' }}>
                   <Store size={28} style={{ color: 'var(--text-4)', marginBottom: '0.75rem' }} />
                   <div style={{ fontWeight: 600 }}>No campaigns yet</div>
                   <div style={{ color: 'var(--text-3)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Create a campaign to publish your first card.</div>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gap: '0.85rem' }}>
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
                   {recentOffers.map((offer) => (
-                    <div key={offer.id} className="glass-card" style={{ borderRadius: '20px', padding: '1rem' }}>
+                    <div key={offer.id} className="glass-card" style={{ borderRadius: '16px', padding: '1rem' }}>
                       <div style={{ fontWeight: 700 }}>{offer.title}</div>
-                      <div style={{ color: 'var(--text-3)', marginTop: '0.25rem' }}>
+                      <div style={{ color: 'var(--text-3)', marginTop: '0.25rem', fontSize: '0.88rem' }}>
                         Sell at ₹{offer.price.toFixed(2)} for ₹{offer.value.toFixed(2)} of value
                       </div>
                     </div>
@@ -431,31 +426,31 @@ export default function MerchantDashboard() {
               )}
             </div>
 
-            <div className="card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
+            <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1.25rem' }}>
                 <div>
                   <span className="section-label">Recent redemptions</span>
-                  <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>Latest cashier activity</h3>
+                  <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.25rem', letterSpacing: '-0.03em' }}>Latest cashier activity</h3>
                 </div>
                 <button className="btn btn-secondary btn-sm" onClick={() => navigate('/merchant/redemptions')}>
                   Open
                 </button>
               </div>
               {recentTransactions.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'var(--surface-soft)', borderRadius: '16px', marginTop: '1rem' }}>
+                <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'rgba(79,99,245,0.04)', borderRadius: '16px' }}>
                   <AlertCircle size={28} style={{ color: 'var(--text-4)', marginBottom: '0.75rem' }} />
                   <div style={{ fontWeight: 600 }}>No redemptions logged</div>
-                  <div style={{ color: 'var(--text-3)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Transactions will appear here once customers scan.</div>
+                  <div style={{ color: 'var(--text-3)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Transactions will appear once customers scan.</div>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gap: '0.85rem' }}>
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
                   {recentTransactions.map((redemption) => (
-                    <div key={redemption.id} className="glass-card" style={{ borderRadius: '20px', padding: '1rem' }}>
+                    <div key={redemption.id} className="glass-card" style={{ borderRadius: '16px', padding: '1rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                        <strong className="mono">{redemption.coupon_code || 'COUPON'}</strong>
-                        <span className="mono">-₹{redemption.amount.toFixed(2)}</span>
+                        <strong className="mono" style={{ fontSize: '0.9rem' }}>{redemption.coupon_code || 'COUPON'}</strong>
+                        <span className="mono" style={{ color: 'var(--red)', fontWeight: 700 }}>-₹{redemption.amount.toFixed(2)}</span>
                       </div>
-                      <div style={{ color: 'var(--text-3)', marginTop: '0.25rem' }}>
+                      <div style={{ color: 'var(--text-3)', marginTop: '0.25rem', fontSize: '0.84rem' }}>
                         Remaining balance ₹{redemption.remaining_balance_after.toFixed(2)}
                       </div>
                     </div>
@@ -469,7 +464,7 @@ export default function MerchantDashboard() {
 
       {currentSection === 'campaigns' && (
         !merchantHasApproval ? (
-          <div className="card" style={{ padding: '2rem', maxWidth: '720px', margin: '0 auto' }}>
+          <div className="glass-card-strong" style={{ padding: '2rem', maxWidth: '720px', margin: '0 auto' }}>
             <span className="section-label">Approval required</span>
             <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>Publishing campaigns is locked</h3>
             <p style={{ color: 'var(--text-3)', marginTop: '0.85rem', lineHeight: 1.7 }}>
@@ -482,7 +477,7 @@ export default function MerchantDashboard() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem', alignItems: 'start' }}>
-          <div className="card" style={{ padding: '2rem' }}>
+          <div className="glass-card-strong" style={{ padding: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
               {[1, 2, 3].map((step) => (
                 <div
@@ -629,7 +624,7 @@ export default function MerchantDashboard() {
               </div>
             </div>
 
-            <div className="card" style={{ padding: '1.5rem' }}>
+            <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
               <span className="section-label">Published campaigns</span>
               <h3 style={{ margin: '0.35rem 0 1rem', fontSize: '1.35rem' }}>Live offers</h3>
               {offers.length === 0 ? (
@@ -669,7 +664,7 @@ export default function MerchantDashboard() {
 
       {currentSection === 'coupons' && (
         !merchantHasApproval ? (
-          <div className="card" style={{ padding: '2rem', maxWidth: '720px', margin: '0 auto' }}>
+          <div className="glass-card-strong" style={{ padding: '2rem', maxWidth: '720px', margin: '0 auto' }}>
             <span className="section-label">Approval required</span>
             <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>Coupons data is locked</h3>
             <p style={{ color: 'var(--text-3)', marginTop: '0.85rem', lineHeight: 1.7 }}>
@@ -680,7 +675,7 @@ export default function MerchantDashboard() {
             </button>
           </div>
         ) : (
-          <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="glass-card-strong" style={{ overflow: 'hidden' }}>
             <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
               <span className="section-label">Purchased Coupons</span>
               <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>Customer buy coupon list</h3>
@@ -733,7 +728,7 @@ export default function MerchantDashboard() {
 
       {currentSection === 'redemptions' && (
         !merchantHasApproval ? (
-          <div className="card" style={{ padding: '2rem', maxWidth: '720px', margin: '0 auto' }}>
+          <div className="glass-card-strong" style={{ padding: '2rem', maxWidth: '720px', margin: '0 auto' }}>
             <span className="section-label">Approval required</span>
             <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>Cashier scanner is disabled</h3>
             <p style={{ color: 'var(--text-3)', marginTop: '0.85rem', lineHeight: 1.7 }}>
@@ -747,7 +742,7 @@ export default function MerchantDashboard() {
           <div className="dashboard-section">
 
 
-          <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="glass-card-strong" style={{ overflow: 'hidden' }}>
             <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
               <span className="section-label">Redemption log</span>
               <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>Transaction history</h3>
@@ -802,7 +797,7 @@ export default function MerchantDashboard() {
       {currentSection === 'onboarding' && (
         <>
           {company?.status === 'pending' && (
-            <div className="card fade-in" style={{ padding: '1.5rem', maxWidth: '720px', margin: '0 auto 1.5rem' }}>
+            <div className="glass-card-strong fade-in" style={{ padding: '1.5rem', maxWidth: '720px', margin: '0 auto 1.5rem' }}>
               <span className="section-label">Approval request sent</span>
               <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>Your profile is under admin review</h3>
               <p style={{ color: 'var(--text-3)', marginTop: '0.75rem', lineHeight: 1.7 }}>
@@ -815,7 +810,7 @@ export default function MerchantDashboard() {
           )}
           {!company || company.status === 'rejected' ? (
             <div style={{ maxWidth: '640px', margin: '0 auto' }} className="fade-in">
-              <div className="card" style={{ padding: '2.5rem', border: '1px solid var(--cyan-border)' }}>
+              <div className="glass-card-strong" style={{ padding: '2.5rem', border: '1px solid var(--cyan-border)' }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                   <span style={{ fontSize: '2rem' }}>ONBOARD</span>
                   <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-1)', margin: '0.5rem 0 0.25rem' }}>
@@ -838,7 +833,7 @@ export default function MerchantDashboard() {
                         borderRadius: '50%',
                         background: step <= kycStep ? 'var(--cyan)' : 'var(--bg-3)',
                         border: `2px solid ${step <= kycStep ? 'var(--cyan)' : 'var(--border)'}`,
-                        color: step <= kycStep ? '#060814' : 'var(--text-3)',
+                        color: step <= kycStep ? '#0a0a1a' : 'var(--text-3)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -931,7 +926,7 @@ export default function MerchantDashboard() {
             </div>
           ) : (
             <div className="responsive-grid-2">
-              <div className="card" style={{ padding: '1.5rem' }}>
+              <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
                   <div>
                     <span className="section-label">Profile details</span>
@@ -948,7 +943,7 @@ export default function MerchantDashboard() {
                 </div>
               </div>
 
-              <div className="card" style={{ padding: '1.5rem' }}>
+              <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
                 <span className="section-label">Settlement and compliance</span>
                 <h3 style={{ margin: '0.35rem 0 1rem', fontSize: '1.35rem' }}>Bank and KYC references</h3>
                 <div style={{ display: 'grid', gap: '0.85rem' }}>

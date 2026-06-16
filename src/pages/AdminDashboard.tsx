@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { TrendingUp, Clock, Building2, ShieldAlert } from 'lucide-react';
 import { useToast } from '../components/Toast';
+import { DashboardCard } from '../components/GlassCard';
 import type { AdminPurchasedCoupon, AdminUser, Company, CompanyStats, GiftCard } from '../lib/supabase';
 import {
   adminApproveCompany,
@@ -332,25 +334,16 @@ export default function AdminDashboard() {
       </div>
 
       <div className="responsive-grid-4">
-        {[
-          { label: 'Platform GTV', value: `₹${platformGtv.toFixed(2)}`, color: 'var(--green)' },
-          { label: 'Pending approvals', value: String(pendingCompanies.length), color: 'var(--cyan)' },
-          { label: 'Partners', value: String(companies.length), color: 'var(--text-1)' },
-          { label: 'Security threats', value: String(securityLogs.length), color: 'var(--red)' },
-        ].map((stat) => (
-          <div key={stat.label} className="card" style={{ padding: '1.25rem 1.5rem' }}>
-            <p style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-3)', margin: '0 0 0.625rem' }}>{stat.label}</p>
-            <p className="mono" style={{ fontSize: '2rem', fontWeight: 800, color: stat.color, margin: 0, letterSpacing: '-0.03em', lineHeight: 1 }}>
-              {stat.value}
-            </p>
-          </div>
-        ))}
+        <DashboardCard title="Platform GTV" value={`₹${platformGtv.toFixed(2)}`} variant="emerald" icon={<TrendingUp size={20} />} />
+        <DashboardCard title="Pending approvals" value={String(pendingCompanies.length)} variant="primary" icon={<Clock size={20} />} />
+        <DashboardCard title="Partners" value={String(companies.length)} variant="violet" icon={<Building2 size={20} />} />
+        <DashboardCard title="Security threats" value={String(securityLogs.length)} variant="amber" icon={<ShieldAlert size={20} />} />
       </div>
 
       {currentSection === 'overview' && (
         <div className="dashboard-section">
           <div className="responsive-grid-2">
-            <div className="card" style={{ padding: '1.5rem' }}>
+            <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
                 <div>
                   <span className="section-label">Approval queue</span>
@@ -379,7 +372,7 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            <div className="card" style={{ padding: '1.5rem' }}>
+            <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
                 <div>
                   <span className="section-label">Recent purchases</span>
@@ -446,7 +439,7 @@ export default function AdminDashboard() {
             </form>
           )}
 
-          <div className="card" style={{ padding: '1.5rem' }}>
+          <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
             {loadingCompanies ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 0' }}><div className="spinner" /></div>
             ) : stats.length === 0 ? (
@@ -521,7 +514,7 @@ export default function AdminDashboard() {
       )}
 
       {currentSection === 'offers' && (
-        <div className="card fade-in" style={{ padding: '1.5rem' }}>
+        <div className="glass-card-strong fade-in" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h3 style={{ margin: 0 }}>Global Market Offers</h3>
             <button className="btn btn-secondary btn-sm" onClick={loadOffers} disabled={offersLoading}>
@@ -530,14 +523,14 @@ export default function AdminDashboard() {
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <table className="premium-table">
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--border)', color: 'var(--text-3)' }}>
-                  <th style={{ padding: '1rem', fontWeight: 600 }}>Offer ID</th>
-                  <th style={{ padding: '1rem', fontWeight: 600 }}>Merchant</th>
-                  <th style={{ padding: '1rem', fontWeight: 600 }}>Campaign Title</th>
-                  <th style={{ padding: '1rem', fontWeight: 600 }}>Value / Price</th>
-                  <th style={{ padding: '1rem', fontWeight: 600 }}>Actions</th>
+                <tr>
+                  <th>Offer ID</th>
+                  <th>Merchant</th>
+                  <th>Campaign Title</th>
+                  <th>Value / Price</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -549,20 +542,19 @@ export default function AdminDashboard() {
                   </tr>
                 ) : (
                   offers.map((offer) => (
-                    <tr key={offer.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td className="mono" style={{ padding: '1rem', fontSize: '0.8rem', color: 'var(--text-3)' }}>{offer.id.split('-')[0]}...</td>
-                      <td style={{ padding: '1rem', fontWeight: 600 }}>{offer.company_name || 'Unknown'}</td>
-                      <td style={{ padding: '1rem' }}>{offer.title}</td>
-                      <td className="mono" style={{ padding: '1rem', fontSize: '0.9rem' }}>
+                    <tr key={offer.id}>
+                      <td className="mono" style={{ fontSize: '0.8rem', color: 'var(--text-4)' }}>{offer.id.split('-')[0]}...</td>
+                      <td style={{ fontWeight: 600 }}>{offer.company_name || 'Unknown'}</td>
+                      <td>{offer.title}</td>
+                      <td className="mono" style={{ fontSize: '0.9rem' }}>
                         <span style={{ color: 'var(--text-3)' }}>Price:</span> ₹{offer.price.toFixed(2)} <br />
                         <span style={{ color: 'var(--text-3)' }}>Value:</span> ₹{offer.value.toFixed(2)}
                       </td>
-                      <td style={{ padding: '1rem' }}>
+                      <td style={{ textAlign: 'right' }}>
                         <button
                           className="btn btn-danger btn-sm"
                           onClick={() => handleDeleteOffer(offer.id, offer.title)}
                           disabled={deletingOfferId === offer.id}
-                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
                         >
                           {deletingOfferId === offer.id ? 'Deleting...' : 'Delete'}
                         </button>
@@ -577,7 +569,7 @@ export default function AdminDashboard() {
       )}
 
       {currentSection === 'users' && (
-        <div className="card" style={{ padding: '1.5rem' }}>
+        <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem', flexWrap: 'wrap' }}>
             <div>
               <span className="section-label">Registered members</span>
@@ -663,7 +655,7 @@ export default function AdminDashboard() {
       )}
 
       {currentSection === 'ledger' && (
-        <div className="card" style={{ padding: '1.5rem' }}>
+        <div className="glass-card-strong" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
             <input className="input" placeholder="Search by code, brand name, or user email..." value={couponSearch} onChange={(event) => setCouponSearch(event.target.value)} style={{ maxWidth: '380px' }} />
             <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -722,7 +714,7 @@ export default function AdminDashboard() {
       )}
 
       {currentSection === 'approvals' && (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="glass-card-strong" style={{ overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 180px', padding: '0.875rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', gap: '1rem' }}>
             <span>Merchant partner request</span>
             <span>Tax identifiers</span>
@@ -766,7 +758,7 @@ export default function AdminDashboard() {
 
           {viewingDoc && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(3,7,18,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-              <div className="card" style={{ maxWidth: '500px', width: '100%', padding: '2rem', textAlign: 'center' }}>
+              <div className="glass-card-strong" style={{ maxWidth: '500px', width: '100%', padding: '2rem', textAlign: 'center' }}>
                 <span style={{ fontSize: '2rem' }}>DOC</span>
                 <h3 style={{ fontSize: '1.25rem', color: 'var(--text-1)', margin: '0.5rem 0' }}>Document vault preview</h3>
                 <p className="mono" style={{ background: 'var(--bg-3)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border)', fontSize: '0.85rem', color: 'var(--cyan)' }}>
@@ -782,7 +774,7 @@ export default function AdminDashboard() {
       )}
 
       {currentSection === 'security' && (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="glass-card-strong" style={{ overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '160px 1.2fr 1.5fr 100px', padding: '0.875rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', gap: '1rem' }}>
             <span>Time</span>
             <span>Threat event</span>

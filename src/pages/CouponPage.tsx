@@ -79,7 +79,7 @@ export default function CouponPage() {
   if (!order) {
     return (
       <div style={{ maxWidth: '400px', margin: '4rem auto', textAlign: 'center' }}>
-        <div className="card" style={{ padding: '3.5rem 2rem', border: '1px solid var(--red-border)' }}>
+        <div className="glass-card-strong" style={{ padding: '3.5rem 2rem', border: '1px solid var(--red-border)' }}>
           <div style={{
             width: '60px', height: '60px', background: 'var(--red-muted)', borderRadius: '50%',
             margin: '0 auto 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -119,11 +119,9 @@ export default function CouponPage() {
         </button>
 
         {/* Coupon Ticket */}
-        <div className="card" style={{ 
+        <div className="glass-card-strong coupon-ticket" style={{ 
           overflow: 'hidden', 
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-          background: 'var(--bg-2)',
-          border: '1px solid var(--border)',
           borderRadius: '24px'
         }}>
           
@@ -143,17 +141,17 @@ export default function CouponPage() {
 
             <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <p style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', color: isUsed ? 'var(--text-4)' : '#060814', opacity: 0.7, marginBottom: '0.4rem' }}>
+                <p style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', color: isUsed ? 'var(--text-4)' : 'var(--text-1)', opacity: 0.7, marginBottom: '0.4rem' }}>
                   OFFICIAL MERCHANT VOUCHER
                 </p>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: isUsed ? 'var(--text-3)' : '#060814', margin: 0, letterSpacing: '-0.04em', lineHeight: 1 }}>
+                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: isUsed ? 'var(--text-3)' : 'var(--text-1)', margin: 0, letterSpacing: '-0.04em', lineHeight: 1 }}>
                   {order.company?.name}
                 </h2>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                   <span style={{ background: 'rgba(0,0,0,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 800, color: isUsed ? 'var(--text-4)' : '#060814' }}>
+                   <span style={{ background: 'rgba(0,0,0,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 800, color: isUsed ? 'var(--text-4)' : 'var(--text-2)' }}>
                      SECURE NODE: {order.company?.prefix}
                    </span>
-                   <span style={{ background: 'rgba(0,0,0,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 800, color: isUsed ? 'var(--text-4)' : '#060814' }}>
+                   <span style={{ background: 'rgba(0,0,0,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 800, color: isUsed ? 'var(--text-4)' : 'var(--text-2)' }}>
                      ID: {id?.substring(0,8).toUpperCase()}
                    </span>
                 </div>

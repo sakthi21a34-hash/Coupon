@@ -5,7 +5,7 @@ const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "https://pl
 const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "placeholder-anon-key";
 
 export const isSupabaseConfigured =
-  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY;
+  !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 if (!isSupabaseConfigured) {
   console.warn(
@@ -14,7 +14,25 @@ if (!isSupabaseConfigured) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
+  global: { headers: {} },
+  db: { schema: 'public' },
+});
+
+/**
+ * Race a promise against a timeout so it never hangs forever.
+ * Rejects with a TimeoutError after `ms` milliseconds.
+ */
+class TimeoutError extends Error {
+  constructor(ms: number) { super(`Request timed out after ${ms}ms`); this.name = 'TimeoutError'; }
+}
+function withTimeout<T>(promise: PromiseLike<T>, ms = 8000): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<T>((_, reject) => setTimeout(() => reject(new TimeoutError(ms)), ms)),
+  ]);
+}
 
 // ---- Interfaces --------------------------------------------------
 
@@ -487,11 +505,11 @@ export async function getCompanyStats(): Promise<CompanyStats[]> {
 
 export async function getGiftCards(companyId?: string): Promise<GiftCard[]> {
   try {
-    let query = supabase.from("gift_cards").select("*, companies(name), coupons(count)");
+    let query = supabase.from("gift_cards").select("*, companies(name)");
     if (companyId) {
       query = query.eq("company_id", companyId);
     }
-    const { data, error } = await query.order("created_at", { ascending: false });
+    const { data, error } = await withTimeout(query.order("created_at", { ascending: false }), 8000);
     if (error) throw error;
     const localCards = getLocal<GiftCard[]>("cv_gift_cards", []);
     const localFiltered = companyId ? localCards.filter(c => c.company_id === companyId) : localCards;
@@ -501,11 +519,7 @@ export async function getGiftCards(companyId?: string): Promise<GiftCard[]> {
       ...(data ?? []).map((d: any) => ({
         ...d,
         company_name: d.companies?.name,
-        issued_count: typeof d.coupons === 'number'
-          ? d.coupons
-          : Array.isArray(d.coupons)
-            ? (d.coupons[0]?.count ?? 0)
-            : 0
+        issued_count: 0
       }))
     ];
   } catch (err: any) {
@@ -641,16 +655,19 @@ export async function purchaseGiftCard(
 
 export async function getUserOrders(userId: string) {
   try {
-    const { data, error } = await supabase
-      .from("orders")
-      .select(`
-        *,
-        company:companies(name, prefix),
-        coupon:coupons(code, is_used, remaining_balance, status)
-      `)
-      .eq("user_id", userId)
-      .eq("status", "paid")
-      .order("created_at", { ascending: false });
+    const { data, error } = await withTimeout(
+      supabase
+        .from("orders")
+        .select(`
+          *,
+          company:companies(name, prefix),
+          coupon:coupons(code, is_used, remaining_balance, status)
+        `)
+        .eq("user_id", userId)
+        .eq("status", "paid")
+        .order("created_at", { ascending: false }),
+      8000
+    );
     if (error) throw error;
     return data ?? [];
   } catch (err: any) {
@@ -674,11 +691,14 @@ export async function getUserOrders(userId: string) {
 
 export async function getUserGiftCards(userId: string): Promise<Coupon[]> {
   try {
-    const { data, error } = await supabase
-      .from("coupons")
-      .select("*, companies(name)")
-      .eq("issued_to", userId)
-      .order("created_at", { ascending: false });
+    const { data, error } = await withTimeout(
+      supabase
+        .from("coupons")
+        .select("*, companies(name)")
+        .eq("issued_to", userId)
+        .order("created_at", { ascending: false }),
+      8000
+    );
     if (error) throw error;
     return (data ?? []).map(d => ({
       ...d,
@@ -863,7 +883,7 @@ export async function getRedemptionTransactions(couponId?: string, companyId?: s
   try {
     // Attempt standard read
     const query = supabase.from("redemptions").select("*, coupons(code, companies(name))");
-    const { data, error } = await query.order("created_at", { ascending: false });
+    const { data, error } = await withTimeout(query.order("created_at", { ascending: false }), 8000);
     if (error) throw error;
     
     let list = (data ?? []).map(d => ({
@@ -1027,11 +1047,14 @@ export async function adminSuspendCompany(companyId: string): Promise<Company> {
 
 export async function getUserWalletBalance(userId: string): Promise<number> {
   try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("wallet_balance")
-      .eq("id", userId)
-      .maybeSingle();
+    const { data, error } = await withTimeout(
+      supabase
+        .from("profiles")
+        .select("wallet_balance")
+        .eq("id", userId)
+        .maybeSingle(),
+      6000
+    );
       
     if (error) throw error;
     if (data) {
